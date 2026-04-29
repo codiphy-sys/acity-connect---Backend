@@ -4,9 +4,8 @@ const cors = require('cors');
 
 const app = express();
 
-app.use(cors({origin: process.env.FRONTEND_URL || '*'}));
+app.use(cors());
 app.use(express.json());
-
 // Import routes so we can use them
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/listings', require('./routes/listings'));
