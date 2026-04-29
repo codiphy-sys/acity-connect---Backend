@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login-A,City Connect</title>
+     <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+    <div class="auth-page">
+
+        <div class="auth-left">
+            <div style="position:relative;">
+                <div style="font-size:22px; font-weight: 700; color: white; margin-bottom: 40px;">
+                    ACity <span style="color: red;">Connect</span>
+                </div>
+                <h2>Your campus marketplace, reimagined</h2>
+                <p style="margin-top: 14px;">
+                    Buy, sell, and trade with fellow ACity students in a secure and convenient platform designed just for you.
+                    Everything you need, all in one place.
+                </p>
+                <img src="photo_2026-04-28_17-24-29.jpg" alt="ACity Connect" style="margin-top: 40px; width:100%; max-width:400px; border-radius: 8px; opacity:0.9;"/>
+                <div style="margin-top: 40; display: flex; flex-direction: column; gap:14px">
+                    <div style="display: flex; align-items: center; gap: 12px; color:rgba(255, 255, 255, 0.8)">
+                        <span style="font-size: 20px;">📦</span>Trade second hand items 
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px; color:rgba(255, 255, 255, 0.8)">
+                        <span style="font-size: 20px;">🤝</span>Exchange skills with ACity peers
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px; color: rgba(255, 255, 255, 0.8);">💬<span> Message directly</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="auth-right">
+            <div class="auth-box">
+                <div class="logo">ACity <span>Connect</span></div>
+                <h1>Welcome back</h1>
+                <p class="subtitle">Sign in with your ACity Student Email</p>
+
+                <div id="error-msg" class="error-msg"></div>
+
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="email">Student Email</label>
+                        <input type="email" id="email" placeholder="yourname@acity.edu.gh" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" placeholder="••••••••" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Sign In</button>
+                </form>
+
+                <div class="auth-switch">
+                    Don't have an account? <a href="register.html">Register here</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module">
+        import { api, saveAuth, getUser } from './js/api.js';
+
+        if (getUser()) window.location.href = 'index.html';
+
+  document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const btn = document.getElementById('submit-btn');
+    const errorEl = document.getElementById('error-msg');
+    errorEl.classList.remove('show');
+
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+
+    btn.disabled = true;
+    btn.textContent = 'Signing in...';
+
+    try {
+      const { token, user } = await api.login({ email, password });
+      saveAuth(token, user);
+      window.location.href = 'index.html';
+    } catch (err) {
+      errorEl.textContent = err.message;
+      errorEl.classList.add('show');
+      btn.disabled = false;
+      btn.textContent = 'Sign in';
+    }
+  });
+    </script>
+</body>
+</html>

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Messages - ACity Connect</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div class="navbar">
+  <a href="index.html" class="logo">ACity<span>Connect</span></a>
+  <nav>
+    <a href="index.html">Listings</a>
+    <a href="messages.html">Messages</a>
+  </nav>
+  <div class="nav-right">
+    <a href="createlisting.html" class="btn btn-primary btn-sm">+ New listing</a>
+    <div class="avatar" id="nav-avatar" onclick="window.location.href='profile.html'"></div>
+    <button class="btn btn-sm" style="background:rgba(255,255,255,0.1); color:white;" onclick="logout()">Sign out</button>
+  </div>
+</div>
+
+<div class="messages-layout">
+  <div class="inbox-list">
+    <div class="inbox-header">Messages</div>
+    <div id="inbox"></div>
+  </div>
+
+  <div class="chat-area" id="chat-area">
+    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#9ca3af;">
+      <div style="font-size:44px; margin-bottom:14px; opacity:0.2;">💬</div>
+      <p>Select a conversation to start chatting</p>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+  import { api, getUser, clearAuth } from './js/api.js';
+
+  const user = getUser();
+  if (!user) window.location.href = 'login.html';
+
+  document.getElementById('nav-avatar').textContent = user?.full_name?.[0]?.toUpperCase() || 'U';
+  window.logout = () => { clearAuth(); window.location.href = 'login.html'; };
+
+  let allMessages = [];
+  let activeKey = null;
+
+  function escHtml(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function getKey(msg) {
+    const otherId = msg.sender_id === user.id ? msg.receiver_id : msg.sender_id;
+    return `${otherId}_${msg.listing_id || 'general'}`;
+  }
+
+  function groupMessages(messages) {
+    const convos = {};
+    messages.forEach(msg => {
+      const key = getKey(msg);
+      if (!convos[key]) {
+        convos[key] = { messages: [], otherName: '', listing_id: msg.listing_id };
+      }
+      convos[key].messages.push(msg);
+      if (msg.sender_id !== user.id) {
+        convos[key].otherName = msg.sender_name || 'Student';
+      } else {
+        convos[key].otherName = msg.receiver_name || 'Student';
+      }
+    });
+    return convos;
+  }
+
+  function renderInbox(convos) {
+    const inbox = document.getElementById('inbox');
+    const keys = Object.keys(convos);
+
+    if (!keys.length) {
+      inbox.innerHTML = '<p style="padding:20px; color:#9ca3af; font-size:14px;">No messages yet</p>';
+      return;
+    }
+
+    inbox.innerHTML = keys.map(key => {
+      const c = convos[key];
+      const last = c.messages[c.messages.length - 1];
+      const isActive = activeKey === key;
+      return `
+        <div class="inbox-item ${isActive ? 'active' : ''}" onclick="openConvo('${key}')">
+          <div class="name">${escHtml(c.otherName)}</div>
+          <div class="preview">${escHtml(last.body.substring(0, 45))}${last.body.length > 45 ? '...' : ''}</div>
+        </div>`;
+    }).join('');
+  }
+
+  window.openConvo = (key) => {
+    activeKey = key;
+    const convos = groupMessages(allMessages);
+    renderInbox(convos);
+    renderChat(convos[key]);
+  };
+
+  function renderChat(convo) {
+    const chatArea = document.getElementById('chat-area');
+    const listingLink = convo.listing_id
+      ? `<a href="listing.html?id=${convo.listing_id}" style="font-size:12px; color:#e94560;">View listing</a>`
+      : '';
+
+    const messages = convo.messages.map(msg => {
+      const sent = msg.sender_id === user.id;
+      const time = new Date(msg.created_at).toLocaleTimeString('en-GH', { hour:'2-digit', minute:'2-digit' });
+      return `
+        <div style="display:flex; flex-direction:column; align-items:${sent ? 'flex-end' : 'flex-start'};">
+          <div class="bubble ${sent ? 'sent' : 'received'}">${escHtml(msg.body)}</div>
+          <span style="font-size:10px; color:#9ca3af; margin-top:3px;">${time}</span>
+        </div>`;
+    }).join('');
+
+    chatArea.innerHTML = `
+      <div class="chat-header">
+        <div class="avatar" style="width:32px; height:32px; font-size:12px;">${convo.otherName?.[0]?.toUpperCase() || '?'}</div>
+        <div>
+          <div>${escHtml(convo.otherName)}</div>
+          ${listingLink}
+        </div>
+      </div>
+      <div class="chat-messages" id="chat-messages">${messages}</div>
+      <div class="chat-input">
+        <input type="text" id="chat-input" placeholder="Type a message..." onkeydown="if(event.key==='Enter') sendMsg()" />
+        <button class="btn btn-primary" onclick="sendMsg()">Send</button>
+      </div>`;
+
+    // scroll to bottom
+    const msgs = document.getElementById('chat-messages');
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  window.sendMsg = async () => {
+    const input = document.getElementById('chat-input');
+    const body = input.value.trim();
+    if (!body || !activeKey) return;
+
+    const convos = groupMessages(allMessages);
+    const convo = convos[activeKey];
+    const otherId = activeKey.split('_')[0];
+
+    try {
+      await api.sendMessage({
+        receiver_id: otherId,
+        listing_id: convo.listing_id,
+        body
+      });
+      input.value = '';
+      await loadMessages();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  async function loadMessages() {
+    try {
+      allMessages = await api.getMessages();
+      const convos = groupMessages(allMessages);
+      renderInbox(convos);
+      if (activeKey && convos[activeKey]) {
+        renderChat(convos[activeKey]);
+      }
+    } catch {}
+  }
+
+  function showToast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `toast ${type} show`;
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  loadMessages();
+  // poll every 5 seconds for new messages
+  setInterval(loadMessages, 5000);
+</script>
+</body>
+</html>

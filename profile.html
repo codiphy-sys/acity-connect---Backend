@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Profile - ACity Connect</title>
+    <link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+
+    <div class="navbar">
+        <a href="index.html" class="logo">ACity <span>Connect</span></a>
+        <nav>
+            <a href="index.html">Listings</a>
+            <a href="messages.html">Messages</a>
+        </nav>
+        <div class="nav-right">
+            <a href="createlisting.html" class="btn btn-primary btn-sm">+ New listing</a>
+            <div class="avatar" id="nav-avatar"></div>
+            <button class="btn btn-sm" style="background: rgba(255, 255, 255, 0.1); color: white;"onclick="logout()">Sign out</button>
+        </div>
+    </div>
+
+    <div class="profile-header">
+        <div class="container">
+            <div class="inner">
+                <div class="profile-avatar" id="profile-avatar">?</div>
+                <div style="flex: 1;">
+                    <h2 id="profile-name">Loading...</h2>
+                    <div class="email" id="profile-email"></div>
+                    <div class="bio" id="profile-bio"></div>
+
+                    <div id="skills-offered-section" style="display: none; margin-top: 12px;">
+                        <div style="font-size: 12px; color: rgba(255, 255, 255, 0.4); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Skills I Offer</div>
+                        <div class="skills-wrap" id="skills-offered-tags"></div>
+                    </div>
+
+                    <div id="skills-needed-section" style="display: none; margin-top: 10px;">
+                        <div style="font-size: 12px; color: rgba(255, 255, 255, 0.4); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Skills I Need</div>
+                        <div class="skills-wrap" id="skills-needed-tags"></div>
+                    </div>
+                </div>
+                <div>
+                    <button class="btn-btn-outline" onclick="toggleEdit()">Edit Profile</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container section">
+
+        <div id="edit-section" style="display: none; margin-bottom: 28px;">
+            <div class="card" style="padding: 24px;">
+                <h3 style="font-size: 17px; margin-bottom: 18px;">Edit Profile</h3>
+                <div id="edit-error" class="error-msg"></div>
+                <form id="edit-form">
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input type="text" id="edit-name" />
+                    </div>
+                    <div class="form-group">
+                        <label>Bio</label>
+                        <textarea id="edit-bio" rows="3" placeholder="Tell ACity Studentss about yourself..."></textarea>
+                    </div>
+                    <div class="form-group">
+    <label>Skills I offer <span style="color: #9ca3af; font-weight: 400;">(comma-separated)</span></label>
+    <input type="text" id="edit-skills-offered" placeholder="e.g. Python, Graphic Design, Math tutoring" />
+</div>
+                    <div class="form-group">
+                        <label>Skills I need <span style="color: #9ca3af; font-weight: 400;">(comma-separated)</span></label>
+                        <input type="text" id="edit-skills-needed" placeholder="e.g., Python, JavaScript, WebTTechDesign" />
+                    </div>
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button type="button" class="btn" style="border:1px solid #ddd;"onclick="toggleEdit()">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="save-btn">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <h2 class="section-title">My Listings</h2>
+        <div id="my-listings" class="listing-grid"></div>
+        <div id="listings-loading" style="text-align: center;"><div class="spinner"></div></div>
+        <div id="listings-empty" class="empty" style="display: none;">
+            <div class="icon">📭</div>
+            <h3>No Listings Found</h3>
+            <p><a href="createlisting.html">Create your first listing</a></p>
+        </div>
+
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script type="module">
+  import { api, getUser, clearAuth, saveAuth, getToken } from './js/api.js';
+
+  const user = getUser();
+  if (!user) window.location.href = 'login.html';
+
+  document.getElementById('nav-avatar').textContent = user?.full_name?.[0]?.toUpperCase() || 'U';
+  window.logout = () => { clearAuth(); window.location.href = 'login.html'; };
+
+  function escHtml(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function renderProfile(u) {
+    document.getElementById('profile-avatar').textContent = u.full_name?.[0]?.toUpperCase() || '?';
+    document.getElementById('profile-name').textContent = u.full_name || '';
+    document.getElementById('profile-email').textContent = u.email || '';
+    document.getElementById('profile-bio').textContent = u.bio || 'No bio added yet';
+
+    const offered = u.skills_offered || [];
+    const needed = u.skills_needed || [];
+
+    if (offered.length) {
+      document.getElementById('skills-offered-section').style.display = 'block';
+      document.getElementById('skills-offered-tags').innerHTML = offered.map(s => `<span class="skill-tag">${escHtml(s)}</span>`).join('');
+    }
+    if (needed.length) {
+      document.getElementById('skills-needed-section').style.display = 'block';
+      document.getElementById('skills-needed-tags').innerHTML = needed.map(s => `<span class="skill-tag">${escHtml(s)}</span>`).join('');
+    }
+
+    // fill edit form
+    document.getElementById('edit-name').value = u.full_name || '';
+    document.getElementById('edit-bio').value = u.bio || '';
+    document.getElementById('edit-skills-offered').value = offered.join(', ');
+    document.getElementById('edit-skills-needed').value = needed.join(', ');
+  }
+
+  window.toggleEdit = () => {
+    const section = document.getElementById('edit-section');
+    section.style.display = section.style.display === 'none' ? 'block' : 'none';
+  };
+
+  document.getElementById('edit-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const btn = document.getElementById('save-btn');
+    const errorEl = document.getElementById('edit-error');
+    errorEl.classList.remove('show');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    const full_name = document.getElementById('edit-name').value.trim();
+    const bio = document.getElementById('edit-bio').value.trim();
+    const skills_offered = document.getElementById('edit-skills-offered').value
+      .split(',').map(s => s.trim()).filter(Boolean);
+    const skills_needed = document.getElementById('edit-skills-needed').value
+      .split(',').map(s => s.trim()).filter(Boolean);
+
+    try {
+      const updated = await api.updateProfile({ full_name, bio, skills_offered, skills_needed });
+      const token = getToken();
+      saveAuth(token, { ...user, full_name: updated.full_name });
+      renderProfile(updated);
+      document.getElementById('nav-avatar').textContent = updated.full_name?.[0]?.toUpperCase() || 'U';
+      toggleEdit();
+      showToast('Profile updated!', 'success');
+    } catch (err) {
+      errorEl.textContent = err.message;
+      errorEl.classList.add('show');
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Save changes';
+  });
+
+  async function loadProfile() {
+    try {
+      const profile = await api.getProfile(user.id);
+      renderProfile(profile);
+    } catch {}
+  }
+
+  async function loadMyListings() {
+    try {
+      const listings = await api.getMyListings();
+      document.getElementById('listings-loading').style.display = 'none';
+
+      if (!listings.length) {
+        document.getElementById('listings-empty').style.display = 'block';
+        return;
+      }
+
+      document.getElementById('my-listings').innerHTML = listings.map(l => {
+        const price = l.price ? `GH₵ ${parseFloat(l.price).toFixed(2)}` : (l.category === 'skill' ? 'Skill exchange' : 'Free');
+        const pendingTag = !l.is_approved ? '<span class="badge badge-pending">Pending</span>' : '';
+        return `
+          <div class="listing-card" onclick="window.location.href='listing.html?id=${l.id}'">
+            <div class="card-img" style="font-size:40px;">${l.category === 'item' ? '📦' : '🎓'}</div>
+            <div class="card-body">
+              <div style="display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap;">
+                <span class="badge ${l.category === 'item' ? 'badge-item' : 'badge-skill'}">${l.category}</span>
+                <span class="badge badge-${l.status}">${l.status}</span>
+                ${pendingTag}
+              </div>
+              <div class="card-title">${escHtml(l.title)}</div>
+              <div class="card-footer">
+                <span class="price">${price}</span>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+    } catch {
+      document.getElementById('listings-loading').style.display = 'none';
+    }
+  }
+
+  function showToast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `toast ${type} show`;
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  loadProfile();
+  loadMyListings();
+</script>
+</body>
+</html>

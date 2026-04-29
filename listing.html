@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Listing - ACity Connect</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div class="navbar">
+  <a href="index.html" class="logo">ACity<span>Connect</span></a>
+  <nav>
+    <a href="index.html">Listings</a>
+    <a href="messages.html">Messages</a>
+  </nav>
+  <div class="nav-right">
+    <a href="createlisting.html" class="btn btn-primary btn-sm">+ New listing</a>
+    
+    <div class="avatar" id="nav-avatar" onclick="window.location.href='profile.html'"></div>
+    <button class="btn btn-sm" style="background:rgba(255,255,255,0.1); color:white;" onclick="logout()">Sign out</button>
+  </div>
+</div>
+
+<div class="container section">
+  <a href="index.html" style="color:#6b7280; font-size:14px;">← Back to listings</a>
+
+  <img src="photo_2026-04-29_00-53-42.jpg" alt="listing board style=" style="margin-top: 40px; margin-bottom: 30px; width:100%; max-width:400px; border-radius: 8px; opacity:1;"/>
+
+  <div id="listing-content" style="margin-top:24px;">
+    <div class="spinner"></div>
+  </div>
+</div>
+
+<!-- Message modal -->
+<div class="modal-bg" id="message-modal">
+  <div class="modal">
+    <h3>Send a message</h3>
+    <p>Reach out to the seller about this listing.</p>
+    <div class="form-group">
+      <label>Your message</label>
+      <textarea id="message-body" rows="4" placeholder="Hi, I'm interested in this listing..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" style="border:1px solid #ddd;" onclick="document.getElementById('message-modal').classList.remove('open')">Cancel</button>
+      <button class="btn btn-primary" id="send-msg-btn" onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- Status modal -->
+<div class="modal-bg" id="status-modal">
+  <div class="modal">
+    <h3>Update status</h3>
+    <p>Change the status of your listing.</p>
+    <div class="form-group">
+      <label>Status</label>
+      <select id="status-select">
+        <option value="available">Available</option>
+        <option value="swapped">Swapped</option>
+        <option value="sold">Sold</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" style="border:1px solid #ddd;" onclick="document.getElementById('status-modal').classList.remove('open')">Cancel</button>
+      <button class="btn btn-primary" onclick="updateStatus()">Update</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+  import { api, getUser, clearAuth } from './js/api.js';
+
+  const user = getUser();
+  if (!user) window.location.href = 'login.html';
+
+  document.getElementById('nav-avatar').textContent = user?.full_name?.[0]?.toUpperCase() || 'U';
+  window.logout = () => { clearAuth(); window.location.href = 'login.html'; };
+
+  const params = new URLSearchParams(window.location.search);
+  const listingId = params.get('id');
+  if (!listingId) window.location.href = 'index.html';
+
+  let currentListing = null;
+
+  function escHtml(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function renderListing(l) {
+    const isOwner = user && l.user_id === user.id;
+    const icon = l.category === 'item' ? '📦' : '🎓';
+    const price = l.price ? `GH₵ ${parseFloat(l.price).toFixed(2)}` : (l.category === 'skill' ? 'Skill exchange' : 'Free');
+    const date = new Date(l.created_at).toLocaleDateString('en-GH', { day:'numeric', month:'long', year:'numeric' });
+
+    return `
+      <div style="display:grid; grid-template-columns:1fr 320px; gap:28px; align-items:start;">
+
+        <div>
+          <div style="background:white; border:1px solid #e5e7eb; border-radius:12px; overflow:hidden; margin-bottom:20px;">
+            <div style="height:280px; background:#f3f4f6; display:flex; align-items:center; justify-content:center; font-size:80px;">${icon}</div>
+          </div>
+
+          <h1 style="font-size:26px; margin-bottom:10px;">${escHtml(l.title)}</h1>
+
+          <div style="display:flex; gap:8px; margin-bottom:18px;">
+            <span class="badge ${l.category === 'item' ? 'badge-item' : 'badge-skill'}">${l.category}</span>
+            <span class="badge badge-${l.status}">${l.status}</span>
+          </div>
+
+          <div class="card" style="padding:22px; margin-bottom:16px;">
+            <h3 style="font-size:15px; margin-bottom:10px;">Description</h3>
+            <p style="color:#6b7280; font-size:14px; line-height:1.8; white-space:pre-wrap;">${escHtml(l.description)}</p>
+          </div>
+
+          <div class="card" style="padding:22px;">
+            <h3 style="font-size:15px; margin-bottom:14px;">About the seller</h3>
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div class="profile-avatar" style="width:48px; height:48px; font-size:18px;">${l.full_name?.[0]?.toUpperCase() || '?'}</div>
+              <div>
+                <div style="font-weight:600;">${escHtml(l.full_name)}</div>
+                <div style="color:#9ca3af; font-size:13px;">${escHtml(l.bio || 'No bio')}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- sidebar -->
+        <div style="display:flex; flex-direction:column; gap:14px; position:sticky; top:74px;">
+          <div class="card" style="padding:22px;">
+            <div style="font-size:26px; font-weight:700; color:#e94560; margin-bottom:4px;">${price}</div>
+            <div style="font-size:13px; color:#9ca3af; margin-bottom:18px;">Posted on ${date}</div>
+
+            ${isOwner ? `
+              <button class="btn btn-block" style="border:1px solid #ddd; margin-bottom:8px;" onclick="document.getElementById('status-modal').classList.add('open'); document.getElementById('status-select').value='${l.status}'">Update status</button>
+              <a href="createlisting.html?edit=${l.id}" class="btn btn-outline btn-block" style="display:block; text-align:center; margin-bottom:8px;">Edit listing</a>
+              <button class="btn btn-block" style="background:#fef2f2; color:#dc2626; border:1px solid #fecaca;" onclick="deleteListing()">Delete listing</button>
+            ` : `
+              <button class="btn btn-primary btn-block" id="interest-btn" onclick="expressInterest()" style="margin-bottom:10px;">I'm interested</button>
+              <button class="btn btn-dark btn-block" onclick="document.getElementById('message-modal').classList.add('open')">Send message</button>
+            `}
+          </div>
+
+          <div class="card" style="padding:18px;">
+            <div style="font-size:12px; font-weight:600; text-transform:uppercase; color:#9ca3af; letter-spacing:0.5px; margin-bottom:12px;">Details</div>
+            <div style="display:flex; flex-direction:column; gap:8px; font-size:13px;">
+              <div style="display:flex; justify-content:space-between;">
+                <span style="color:#6b7280;">Category</span>
+                <span style="font-weight:500; text-transform:capitalize;">${l.category}</span>
+              </div>
+              <div style="display:flex; justify-content:space-between;">
+                <span style="color:#6b7280;">Status</span>
+                <span style="font-weight:500; text-transform:capitalize;">${l.status}</span>
+              </div>
+              <div style="display:flex; justify-content:space-between;">
+                <span style="color:#6b7280;">Posted</span>
+                <span style="font-weight:500;">${date}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  async function loadListing() {
+    try {
+      currentListing = await api.getListing(listingId);
+      document.getElementById('listing-content').innerHTML = renderListing(currentListing);
+      document.title = `${currentListing.title} - ACity Connect`;
+    } catch {
+      document.getElementById('listing-content').innerHTML = `
+        <div class="empty">
+          <div class="icon">😕</div>
+          <h3>Listing not found</h3>
+          <p><a href="index.html" style="color:#e94560;">Back to listings</a></p>
+        </div>`;
+    }
+  }
+
+  window.expressInterest = async () => {
+    try {
+      await api.expressInterest(listingId);
+      showToast('Interest recorded!', 'success');
+      const btn = document.getElementById('interest-btn');
+      if (btn) { btn.textContent = 'Interest sent ✓'; btn.disabled = true; }
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  window.sendMessage = async () => {
+    const body = document.getElementById('message-body').value.trim();
+    if (!body) return;
+
+    const btn = document.getElementById('send-msg-btn');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+
+    try {
+      await api.sendMessage({ receiver_id: currentListing.user_id, listing_id: listingId, body });
+      document.getElementById('message-modal').classList.remove('open');
+      showToast('Message sent!', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Send';
+  };
+
+  window.updateStatus = async () => {
+    const status = document.getElementById('status-select').value;
+    try {
+      await api.updateListing(listingId, { status });
+      document.getElementById('status-modal').classList.remove('open');
+      showToast('Status updated!', 'success');
+      loadListing();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  window.deleteListing = async () => {
+    if (!confirm('Delete this listing? This cannot be undone.')) return;
+    try {
+      await api.deleteListing(listingId);
+      showToast('Listing deleted', 'success');
+      setTimeout(() => window.location.href = 'index.html', 1200);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  function showToast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `toast ${type} show`;
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  loadListing();
+</script>
+</body>
+</html>

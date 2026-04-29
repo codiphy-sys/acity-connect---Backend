@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Listing - ACity Connect</title>
+    <link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+    
+    <div class="navbar">
+        <a href="index.html" class="logo">ACity <span>Connect</span></a>
+        <nav>
+            <a href="index.html">Listings</a>
+            <a href="messages.html">Messages</a>
+        </nav>
+        <div class="nav-right">
+            <div class="avatar" id="nav-avatar" onclick="window.location.href='profile.html'"></div>
+            <button class="btn btn-sm" style="background :rgba(255, 255, 255, 0.1); color:white;" onclick="logout()">Sign Out</button>
+        </div>
+    </div>
+
+    <div class="page-header">
+        <div class="container">
+            <h1 id="page-title">Create Listing</h1>
+            <p id="page-subtitle">Post an item for sale or skill you want to offer to an ACity student</p>
+        </div>
+    </div>
+
+    <div class="container section" style="max-width: 700px;">
+        <a href="index.html" style="color: #6b7280; font-size: 14px;"><- Back to Listings</a>
+
+        <div class="card" style="padding: 28px; margin-top: 20px;"></div>
+        <div id="error-msg" class="error-msg"></div>
+
+        <form id="listing-form">
+            <!-- Form fields will be added here -->
+             <div class="form-group">
+                <label for="title">Title *</label>
+                <input type="text" id="title" placeholder="e.g. Used Textbooks for Sale,Python and html tutoring" required/>
+             </div>
+
+             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                    <label for="price">Price *</label>
+                    <input type="number" id="price" placeholder="e.g. 10.00" step="0.01" required/>
+                </div>
+                <div class="form-group">
+                    <label for="category">Category *</label>
+                    <select id="category" required>
+                        <option value="">Select a category</option>
+                        <option value="item">Item(physical goods)</option>
+                        <option value="skill">Skill(service/exchange)</option>
+                    </select>
+                </div>
+                  <div class="form-group">
+                <label for="price">Price(GHs) - optional</label>
+                <input type="number" id="price" placeholder="Leave blank for free" min="0" step="0.01"/>
+             </div>
+                </div>
+
+             <div class="form-group">
+                <label for="description">Description *</label>
+                <textarea id="description" rows="5" placeholder="Describe your item or service in detail..." required></textarea>
+             </div>
+
+             <div id="skill-tip" style="display: none; background: #ecfdf5; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #166534; margin-bottom: 16px; ">
+                <strong>Tip:</strong> For skill-based listings, consider offering your services in exchange for other skills or as a paid service.
+             </div>
+
+             <div style="display: flex; gap: 10px; justify-content: flex-end; padding-top: 16px; border-top: 1px solid #f3f4f6;">
+                <a href="index.html" class="btn" style="border: 1px solid #ddd;">Cancel</a>
+                <button type="submit" class="btn btn-primary" id="submit-btn">Post Listing</button>
+             </div>
+        </form>
+    </div>
+
+     <p style="font-size:13px; color:#9ca3af; margin-top:14px; text-align:center;">
+    All listings are reviewed by an admin before going live.
+  </p>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+  import { api, getUser, clearAuth } from './js/api.js';
+
+  const user = getUser();
+  if (!user) window.location.href = 'login.html';
+
+  document.getElementById('nav-avatar').textContent = user?.full_name?.[0]?.toUpperCase() || 'U';
+  window.logout = () => { clearAuth(); window.location.href = 'login.html'; };
+
+  // check if editing
+  const urlParams = new URLSearchParams(window.location.search);
+  const editId = urlParams.get('edit');
+
+  if (editId) {
+    document.getElementById('page-title').textContent = 'Edit listing';
+    document.getElementById('submit-btn').textContent = 'Save changes';
+    document.title = 'Edit Listing - ACity Connect';
+    loadExistingListing(editId);
+  }
+
+  async function loadExistingListing(id) {
+    try {
+      const l = await api.getListing(id);
+      if (l.user_id !== user.id) {
+        window.location.href = 'index.html';
+        return;
+      }
+      document.getElementById('title').value = l.title;
+      document.getElementById('category').value = l.category;
+      document.getElementById('price').value = l.price || '';
+      document.getElementById('description').value = l.description;
+      toggleSkillTip(l.category);
+    } catch {
+      window.location.href = 'index.html';
+    }
+  }
+
+  document.getElementById('category').addEventListener('change', function() {
+    toggleSkillTip(this.value);
+  });
+
+  function toggleSkillTip(cat) {
+    document.getElementById('skill-tip').style.display = cat === 'skill' ? 'block' : 'none';
+  }
+
+  console.log(document.getElementById('listing-form'));
+console.log(document.getElementById('error-msg'));
+console.log(document.getElementById('category'));
+
+  document.getElementById('listing-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const btn = document.getElementById('submit-btn');
+    const errorEl = document.getElementById('error-msg');
+    errorEl.classList.remove('show');
+
+    const title = document.getElementById('title').value.trim();
+    const category = document.getElementById('category').value;
+    const price = document.getElementById('price').value;
+    const description = document.getElementById('description').value.trim();
+
+    if (!title || !category || !description) {
+      errorEl.textContent = 'Please fill in all required fields.';
+      errorEl.classList.add('show');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = editId ? 'Saving...' : 'Posting...';
+
+    try {
+      const body = {
+        title,
+        category,
+        description,
+        price: price ? parseFloat(price) : null
+      };
+
+      if (editId) {
+        await api.updateListing(editId, body);
+        showToast('Listing updated!', 'success');
+        setTimeout(() => window.location.href = `listing.html?id=${editId}`, 1200);
+      } else {
+        const result = await api.createListing(body);
+        showToast('Listing posted! Pending admin approval.', 'success');
+        setTimeout(() => window.location.href = `listing.html?id=${result.id}`, 1500);
+      }
+    } catch (err) {
+      errorEl.textContent = err.message;
+      errorEl.classList.add('show');
+      btn.disabled = false;
+      btn.textContent = editId ? 'Save changes' : 'Post listing';
+    }
+  });
+
+  function showToast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `toast ${type} show`;
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+</script>
+</body>
+</html>
+

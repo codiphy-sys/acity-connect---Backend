@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACity Connect - Campus Marketplace</title>
+    <link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+
+    <div class="navbar">
+        <a href="index.html" class="logo">ACity <span>Connect</span></a>
+        <nav>
+            <a href="index.html"> Listings </a>
+            <a href="messages.html"> Messages </a>
+        </nav>
+        <div class="nav-right">
+            <a href="createlisting.html" class="btn btn-primary btn-small">+ New Listing</a>
+            <div class="avatar" id="nav-avatar" onclick="window.location.href='profile.html'"></div>
+            <button class="btn btn btn" style="background:rgba(255, 255, 255, 0.1);color:white;" onclick="logout()">Sign Out</button> 
+        </div>
+    </div>
+
+    <div class="page-header">
+        <div class="container">
+            <h1>Campus Marketplace</h1>
+            <p>Buy, sell and trade with fellow ACity students</p>
+            <img src="https://c8.alamy.com/comp/M7XPJR/young-people-social-networking-and-connecting-together-online-community-M7XPJR.jpg" alt="iamge" style="margin-top: 20px; width:100%; max-width:600px; border-radius: 8px; opacity:0.9;"/>
+            
+            <div class="search-box">
+                <input type="text" id="search-input" placeholder="Search listings..."/>
+                <button class="btn btn-primary btn.small" onclick="loadListings()">Search</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container section">
+
+        <div class="filters">
+            <span style="font-size: 13px; color: brown;">Filter by:</span>
+            <button class="chip active" onclick="setCategory('',this)">All</button>
+            <button class="chip" onclick="setCategory('item',this)">Items</button>
+            <button class="chip" onclick="setCategory('skill',this)">Skills</button>
+            <div style="margin-left: auto; display:flex; gap:8px"></div>
+            <button class="chip" onclick="setStatus('available', this)">Available</button>
+            <button class="chip" onclick="setStatus('swapped', this)">Swapped</button>
+            <button class="chip" onclick="setStatus('sold', this)"></button>
+        </div>
+    </div>
+
+    <div id="listings-grid" class="listings-grid"></div>
+
+    <div id="empty-state" class="empty" style="display: none;">
+        <h3>No listings found</h3>
+        <p>Try a different search or <a href="createlisting.html" style="color: brown;">post a new listing</a></p>
+    </div>
+
+    <div id="loading" style="text-align: center;padding: 40px;">
+        <div class="spinner"></div>
+    </div>
+    
+</div>
+
+<div class="toast" id="toast"></div>
+
+//javascript for interactivity on the webpage
+<script type="module">
+  import { api, getUser, clearAuth } from './js/api.js';
+
+  const user = getUser();
+  if (!user) window.location.href = 'login.html';
+
+  document.getElementById('nav-avatar').textContent = user?.full_name?.[0]?.toUpperCase() || 'U';
+
+  window.logout = () => {
+    clearAuth();
+    window.location.href = 'login.html';
+  };
+
+  let currentCategory = '';
+  let currentStatus = '';
+
+   window.setCategory = (val, el) => {
+    document.querySelectorAll('.filters .chip').forEach(c => {
+      if (['', 'item', 'skill'].includes(c.dataset?.cat ?? c.textContent.toLowerCase().trim())) {
+        c.classList.remove('active');
+      }
+    });
+    // simpler approach - remove active from first 3 chips
+    const chips = document.querySelectorAll('.filters .chip');
+    chips[0].classList.remove('active');
+    chips[1].classList.remove('active');
+    chips[2].classList.remove('active');
+    el.classList.add('active');
+    currentCategory = val;
+    loadListings();
+  };
+
+  window.setStatus = (val, el) => {
+    const wasActive = el.classList.contains('active');
+    const statusChips = document.querySelectorAll('.filters .chip');
+    statusChips[3]?.classList.remove('active');
+    statusChips[4]?.classList.remove('active');
+    statusChips[5]?.classList.remove('active');
+    if (!wasActive) {
+      el.classList.add('active');
+      currentStatus = val;
+    } else {
+      currentStatus = '';
+    }
+    loadListings();
+  };
+
+  document.getElementById('search-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') loadListings();
+  });
+
+  function escHtml(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function renderCard(listing) {
+    const icon = listing.category === 'item' ? '📦' : '🎓';
+    const price = listing.price
+      ? `GH₵ ${parseFloat(listing.price).toFixed(2)}`
+      : listing.category === 'skill' ? 'Skill exchange' : 'Free';
+    const initial = listing.full_name?.[0]?.toUpperCase() || '?';
+
+    return `
+      <div class="listing-card" onclick="window.location.href='listing.html?id=${listing.id}'">
+        <div class="card-img">${icon}</div>
+        <div class="card-body">
+          <div style="display:flex; gap:6px; margin-bottom:8px;">
+            <span class="badge ${listing.category === 'item' ? 'badge-item' : 'badge-skill'}">${listing.category}</span>
+            <span class="badge badge-${listing.status}">${listing.status}</span>
+          </div>
+          <div class="card-title">${escHtml(listing.title)}</div>
+          <div class="card-desc">${escHtml(listing.description)}</div>
+          <div class="card-footer">
+            <span class="price">${price}</span>
+            <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:#9ca3af;">
+              <div style="width:22px; height:22px; background:#1a1a2e; color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:600;">${initial}</div>
+              ${escHtml(listing.full_name || 'Student')}
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  window.loadListings = async () => {
+    const search = document.getElementById('search-input').value.trim();
+    const params = {};
+    if (search) params.search = search;
+    if (currentCategory) params.category = currentCategory;
+    if (currentStatus) params.status = currentStatus;
+
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('listings-grid').innerHTML = '';
+    document.getElementById('empty-state').style.display = 'none';
+
+    try {
+      const listings = await api.getListings(params);
+      document.getElementById('loading').style.display = 'none';
+
+      if (!listings.length) {
+        document.getElementById('empty-state').style.display = 'block';
+      } else {
+        document.getElementById('listings-grid').innerHTML = listings.map(renderCard).join('');
+      }
+    } catch (err) {
+      document.getElementById('loading').style.display = 'none';
+      showToast('Failed to load listings', 'error');
+    }
+  };
+
+  function showToast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `toast ${type} show`;
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  loadListings();
+
+</script>
+</body>
+</html>

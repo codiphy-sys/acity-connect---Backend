@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin - ACity Connect</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div class="navbar">
+  <a href="index.html" class="logo">ACity<span>Connect</span></a>
+  <div class="nav-right">
+    <span class="badge badge-admin">Admin</span>
+    <div class="avatar" id="nav-avatar"></div>
+    <button class="btn btn-sm" style="background:rgba(255,255,255,0.1); color:white;" onclick="logout()">Sign out</button>
+  </div>
+</div>
+
+<div class="admin-wrap">
+
+  <div class="admin-sidebar">
+    <div style="padding:16px 22px; font-size:12px; font-weight:600; text-transform:uppercase; color:rgba(255,255,255,0.3); letter-spacing:1px;">
+      Admin Panel
+    </div>
+    <a href="#" class="active" onclick="showSection('overview', this)">📊 Overview</a>
+    <a href="#" onclick="showSection('listings', this)">📋 Listings</a>
+    <a href="#" onclick="showSection('users', this)">👥 Users</a>
+    <div style="margin-top:auto; padding:20px 22px;">
+      <a href="index.html" style="color:rgba(255,255,255,0.3); font-size:13px;">← Back to site</a>
+    </div>
+  </div>
+
+  <div class="admin-main">
+
+    <!-- Overview -->
+    <div id="section-overview">
+      <h2 style="font-size:22px; margin-bottom:20px;">Overview</h2>
+
+      <div class="stats-row">
+        <div class="stat-box">
+          <div class="num" id="stat-users">-</div>
+          <div class="label">Total users</div>
+        </div>
+        <div class="stat-box">
+          <div class="num" id="stat-listings">-</div>
+          <div class="label">Total listings</div>
+        </div>
+        <div class="stat-box">
+          <div class="num" id="stat-pending">-</div>
+          <div class="label">Pending approval</div>
+        </div>
+        <div class="stat-box">
+          <div class="num" id="stat-interactions">-</div>
+          <div class="label">Interactions</div>
+        </div>
+      </div>
+
+      <h3 style="font-size:16px; margin-bottom:14px;">Pending listings</h3>
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Category</th>
+              <th>Seller</th>
+              <th>Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="pending-tbody">
+            <tr><td colspan="5" style="text-align:center; color:#9ca3af; padding:20px;">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- All listings -->
+    <div id="section-listings" style="display:none;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+        <h2 style="font-size:22px;">All listings</h2>
+        <select class="btn" style="border:1px solid #ddd; padding:6px 12px;" id="listing-filter" onchange="loadAllListings()">
+          <option value="">All</option>
+          <option value="pending">Pending only</option>
+          <option value="approved">Approved only</option>
+        </select>
+      </div>
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Category</th>
+              <th>Seller</th>
+              <th>Status</th>
+              <th>Approved</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="all-listings-tbody">
+            <tr><td colspan="6" style="text-align:center; color:#9ca3af; padding:20px;">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Users -->
+    <div id="section-users" style="display:none;">
+      <h2 style="font-size:22px; margin-bottom:20px;">All users</h2>
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Joined</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody">
+            <tr><td colspan="5" style="text-align:center; color:#9ca3af; padding:20px;">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+  import { api, getUser, clearAuth } from './js/api.js';
+
+  const user = getUser();
+  if (!user) window.location.href = 'login.html';
+  if (user.role !== 'admin') window.location.href = 'index.html';
+
+  document.getElementById('nav-avatar').textContent = user?.full_name?.[0]?.toUpperCase() || 'A';
+  window.logout = () => { clearAuth(); window.location.href = 'login.html'; };
+
+  function escHtml(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  window.showSection = (name, el) => {
+    document.querySelectorAll('[id^="section-"]').forEach(s => s.style.display = 'none');
+    document.getElementById(`section-${name}`).style.display = 'block';
+    document.querySelectorAll('.admin-sidebar a').forEach(a => a.classList.remove('active'));
+    el.classList.add('active');
+
+    if (name === 'listings') loadAllListings();
+    if (name === 'users') loadUsers();
+  };
+
+  async function loadStats() {
+    try {
+      const stats = await api.adminGetStats();
+      document.getElementById('stat-users').textContent = stats.users || 0;
+      document.getElementById('stat-listings').textContent = stats.listings || 0;
+      document.getElementById('stat-pending').textContent = stats.pending || 0;
+      document.getElementById('stat-interactions').textContent = stats.interactions || 0;
+    } catch {}
+  }
+
+  async function loadPending() {
+    try {
+      const listings = await api.adminGetListings('pending');
+      const tbody = document.getElementById('pending-tbody');
+
+      if (!listings.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#9ca3af; padding:20px;">No pending listings</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = listings.map(l => {
+        const date = new Date(l.created_at).toLocaleDateString('en-GH');
+        return `<tr>
+          <td><a href="listing.html?id=${l.id}" style="color:#e94560; font-weight:500;">${escHtml(l.title)}</a></td>
+          <td><span class="badge ${l.category === 'item' ? 'badge-item' : 'badge-skill'}">${l.category}</span></td>
+          <td style="font-size:13px;">${escHtml(l.full_name || '-')}</td>
+          <td style="font-size:13px; color:#9ca3af;">${date}</td>
+          <td>
+            <div style="display:flex; gap:6px;">
+              <button class="btn btn-sm" style="background:#ecfdf5; color:#059669; border:1px solid #bbf7d0;" onclick="approveListing('${l.id}')">Approve</button>
+              <button class="btn btn-sm" style="background:#fef2f2; color:#dc2626; border:1px solid #fecaca;" onclick="removeListing('${l.id}')">Delete</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    } catch {}
+  }
+
+  window.loadAllListings = async () => {
+    const filter = document.getElementById('listing-filter')?.value || '';
+    try {
+      const listings = await api.adminGetListings(filter);
+      const tbody = document.getElementById('all-listings-tbody');
+
+      if (!listings.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#9ca3af; padding:20px;">No listings found</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = listings.map(l => {
+        const date = new Date(l.created_at).toLocaleDateString('en-GH');
+        return `<tr>
+          <td><a href="listing.html?id=${l.id}" style="color:#e94560; font-weight:500;">${escHtml(l.title)}</a></td>
+          <td><span class="badge ${l.category === 'item' ? 'badge-item' : 'badge-skill'}">${l.category}</span></td>
+          <td style="font-size:13px;">${escHtml(l.full_name || '-')}</td>
+          <td><span class="badge badge-${l.status}">${l.status}</span></td>
+          <td style="font-size:13px;">${l.is_approved ? '✓ Yes' : '✗ No'}</td>
+          <td>
+            <div style="display:flex; gap:6px;">
+              ${!l.is_approved ? `<button class="btn btn-sm" style="background:#ecfdf5; color:#059669; border:1px solid #bbf7d0;" onclick="approveListing('${l.id}')">Approve</button>` : ''}
+              <button class="btn btn-sm" style="background:#fef2f2; color:#dc2626; border:1px solid #fecaca;" onclick="removeListing('${l.id}')">Delete</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    } catch {}
+  };
+
+  window.approveListing = async (id) => {
+    try {
+      await api.adminApproveListing(id);
+      showToast('Listing approved!', 'success');
+      loadPending();
+      loadStats();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  window.removeListing = async (id) => {
+    if (!confirm('Delete this listing permanently?')) return;
+    try {
+      await api.adminDeleteListing(id);
+      showToast('Listing deleted', 'success');
+      loadPending();
+      loadStats();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  async function loadUsers() {
+    try {
+      const users = await api.adminGetUsers();
+      const tbody = document.getElementById('users-tbody');
+
+      if (!users.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#9ca3af; padding:20px;">No users yet</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = users.map(u => {
+        const date = new Date(u.created_at).toLocaleDateString('en-GH');
+        return `<tr>
+          <td style="font-weight:500;">${escHtml(u.full_name)}</td>
+          <td style="font-size:13px; color:#6b7280;">${escHtml(u.email)}</td>
+          <td><span class="badge ${u.role === 'admin' ? 'badge-admin' : 'badge-item'}">${u.role}</span></td>
+          <td style="font-size:13px; color:#9ca3af;">${date}</td>
+          <td>
+            ${u.role !== 'admin'
+              ? `<button class="btn btn-sm" style="border:1px solid #ddd;" onclick="makeAdmin('${u.id}')">Make admin</button>`
+              : '<span style="font-size:13px; color:#9ca3af;">—</span>'}
+          </td>
+        </tr>`;
+      }).join('');
+    } catch {}
+  }
+
+  window.makeAdmin = async (id) => {
+    if (!confirm('Promote this user to admin?')) return;
+    try {
+      await api.adminUpdateUserRole(id, 'admin');
+      showToast('User promoted to admin', 'success');
+      loadUsers();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  function showToast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `toast ${type} show`;
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  loadStats();
+  loadPending();
+</script>
+</body>
+</html>

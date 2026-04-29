@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - ACity Connect</title>
+        <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+    <div class="auth-page">
+
+        <div class="auth-left">
+            <div style="position:relative;">
+                <div style="font-size:22px; font-weight: 700; color: white; margin-bottom: 40px;">
+                    ACity <span style="color: red;">Connect</span>
+                </div>
+                <h2>Join the ACity Student Community.</h2>
+                <p style="margin-top: 14px;">
+                    Only Academic City students can register. 
+                    Sign up with your student email to start buying, selling, and trading on the campus marketplace.
+                </p>
+                <img src="photo_2026-04-29_00-32-06.jpg" alt="ACity Connect" style="margin-top: 40px; width:100%; max-width:400px; border-radius: 8px; opacity:0.9;" />
+                <div style="margin-top: 40; display: strong; flex-direction: column; gap:14px">
+                    <div style="display: flex; align-items: center; gap: 12px; color:rgba(255, 255, 255, 0.8)">
+                        <span style="font-size: 20px;">📦</span>Trade second hand items 
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px; color:rgba(255, 255, 255, 0.8)">
+                        <span style="font-size: 20px;">🤝</span>Exchange skills with ACity peers
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px; color: rgba(255, 255, 255, 0.8);">💬<span> Message directly</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="auth-right">
+            <div class="auth-box">
+                <div class="logo">ACity <span>Connect</span></div>
+                <h1>Create your account</h1>
+                <p class="subtitle"> Fill in your details to get started</p>
+    
+                <div id="error-msg" class="error-msg"></div>
+
+                <form id="register-form">
+                    <div class="form-group">
+                        <label for="full_name">Full Name</label>
+                        <input type="text" id="full_name" placeholder="eg Kwame Nyako" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Student Email</label>
+                        <input type="email" id="email" placeholder="yourname@acity.edu.gh" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" placeholder="At least 8 characters" required minlength="8" />
+                    </div>
+                    <div class="form-group">
+                        <label for="confirm_password">Confirm Password</label>
+                        <input type="password" id="confirm_password" placeholder="Re-enter your password" required />
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Create Account</button>
+                </form>
+
+                <div class="auth-switch">
+                    Already have an account? <a href="login.html">Sign in</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module">
+    import { api, saveAuth, getUser } from './js/api.js';
+
+    if (getUser()) window.location.href = 'index.html';
+
+    const form = document.getElementById('register-form');
+    const errorMsg = document.getElementById('error-msg');
+    const btn = document.getElementById('submit-btn');
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errorMsg.classList.remove('show');
+
+        const full_name = document.getElementById('full_name').value.trim();
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        const confirm_password = document.getElementById('confirm_password').value;
+
+        if (password !== confirm_password) {
+            errorMsg.textContent = 'Passwords do not match';
+            errorMsg.classList.add('show');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Creating account...';
+
+        const result = await api.register({ full_name, email, password });
+        saveAuth(result.token, result.user);
+        window.location.href = 'index.html';
+    });
+</script>
+    
+    
+</body>
+</html>
